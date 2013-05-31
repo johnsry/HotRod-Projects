@@ -1,0 +1,204 @@
+#!/bin/sh
+#Run this script as root to configure Fedora for Hot Rod use.
+#
+clear
+
+echo '########################################################'
+echo '# This script will automate the process of setting up  #'
+echo '# Fedora to my standard configuration                  #'
+echo '########################################################'
+
+
+systemUpdate() {
+echo '########################################################'
+echo '# Update the current system packages                   #'
+echo '########################################################'  
+yum update -y
+}
+
+installRPMFusion() {
+echo '########################################################'
+echo '# Install/Update RPMFusion repository packages         #'
+echo '########################################################'  
+yum localinstall -y --nogpgcheck http://download1.rpmfusion.org/free/fedora/rpmfusion-free-release-$(rpm -E %fedora).noarch.rpm http://download1.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-$(rpm -E %fedora).noarch.rpm
+}
+
+echo '########################################################'
+echo '# This script will automate the process of setting up  #'
+echo '# Fedora to my standard configuration                  #'
+echo '########################################################'
+
+# fstab - create directories and map NAS drives to the system
+
+editFstab() {
+
+echo '########################################################'
+echo '# Setting up fstab drive mapping to the NAS drive      #'
+echo '########################################################'
+
+HOME="/home/rjohns05"
+NASSERVER="//192.168.200.20/"
+NASFOLDER=(music photos movies documents software backups)
+NASDIRECTORIES=(Music Pictures Videos Documents Downloads/software Downloads/backup)
+NASOPTIONS="cifs    username=rjohns05,password=8ognohin,_netdev,uid=rjohns05,gid=rjohns05    0 0"
+NASSYMLINK="Downloads/virgus"
+for index in 0 1 2 3 4 5;
+	do 
+		#Check to see if local folders exist
+		if [ -e $HOME"/"${NASDIRECTORIES[${index}]} ] && [ -d $HOME"/"${NASDIRECTORIES[${index}]} ];then
+			echo $HOME"/"${NASDIRECTORIES[${index}]} " directory already exist!"
+			echo ${NASFOLDER[${index}]}
+			#echo $(cat /etc/fstab | grep -c -F ""${NASFOLDER[${index}]}"")	
+			 if [ $(cat /etc/fstab | grep -c -F ""${NASFOLDER[${index}]}"") = 1 ]; then
+                        	echo "${NASFOLDER[${index}]}" " is already in the fstab"
+			else
+				echo "Adding " "${NASFOLDER[${index}]}" " to /etc/fstab"
+           			echo $NASSERVER${NASFOLDER[${index}]} " " $HOME"/"${NASDIRECTORIES[${index}]}" " $NASOPTIONS >> /etc/fstab
+		     	fi
+
+					
+		else
+			echo "making directory " $HOME"/"${NASDIRECTORIES[${index}]}
+                        mkdir -v $HOME"/"${NASDIRECTORIES[${index}]}
+			if [ $(cat /etc/fstab | grep -c -F ""${NASFOLDER[${index}]}"") = 1 ]; then
+                                echo "${NASFOLDER[${index}]}" " is already in the fstab"
+                        else
+                                echo "Adding " "${NASFOLDER[${index}]}" " to /etc/fstab"
+                                echo $NASSERVER${NASFOLDER[${index}]} " " $HOME"/"${NASDIRECTORIES[${index}]}" " $NASOPTIONS >> /etc/fstab
+                        fi
+		fi	
+
+		#echo $NASSERVER${NASFOLDER[${index}]} " " $HOME"/"${NASDIRECTORIES[${index}]}" " $NASOPTIONS
+	done
+mount -a 
+# Add virgus symlink
+if [ -e $HOME"/Downloads/backup" ] && [ -d $HOME"/Downloads/backup" ];then
+	echo "creating symbolic link " $HOME"/Downloads/backup/virgus"
+        ln -s $HOME"/Downloads/backup/virgus" $HOME"/Downloads/virgus"
+fi
+	
+
+}
+
+#crontab
+
+setupCrontab(){
+
+echo '########################################################'
+echo '# Adding crontab entries                               #'
+echo '########################################################'
+
+for cronEntries in '35 * * * * rjohns05 /home/rjohns05/bin/hgc -find' '0 * * * * root mount -a' '0 16 * * * root yum -y update'  
+	do
+		echo "$cronEntries"
+
+		if [ $(cat /etc/crontab | grep -c -F """$cronEntries""") != 1 ];then
+			echo "Adding " "$cronEntries" " to /etc/crontab"
+			echo "$cronEntries" >> /etc/crontab
+		else 
+			echo "$cronEntries" " is already in the crontab"
+		fi
+	done
+
+crontab -u rjohns05 /etc/crontab
+crontab -u root /etc/crontab		
+}
+
+# hgc
+installHGC() {
+HOME="/home/rjohns05"
+cp -v $HOME/Downloads/virgus/hgc/hgc $HOME/bin
+
+}
+
+#multimedia installation
+
+installWMV() {
+
+echo '########################################################'
+echo '# Installing totem media codecs                        #'
+echo '########################################################'
+
+yum install gstreamer1-libav gstreamer1-plugins-ugly -y
+
+}
+
+#virt
+
+#imageScan
+
+installImageScan() {
+
+echo '########################################################'
+echo '# Installing software for Epson GT-2500 scanner        #'
+echo '########################################################'
+
+
+imageScanSite='http://download.ebz.epson.net/dsc/du/02/DriverDownloadInfo.do?LG2=EN&CN2=&DSCMI=21580&DSCCHK=ea245da3525f56d8ca2ab9408ed2d6d8b481d435'
+
+imageScanfiles=$(wget -O- $imageScanSite |  grep "http.*ltdl7.x86_64.rpm" | grep "http.*noarch.rpm" -o | sed -e 's/<tr><td align="left">/\n/g' | sed -e 's/<tr><td align="left">/\n/g' | grep -e x86_64.rpm -e noarch | grep http | sed -e 's/http/\nhttp/g' | awk '/http/ && /rpm/' | sed -e 's/'\'');"><\/td><\/tr>//g')
+
+	yum install $imageScanfiles -y --skip-broken
+	
+}
+
+#wine
+
+#adobeFlash
+
+installAdobeFlash() {
+
+echo '########################################################'
+echo '# Installing Adobe Flash                               #'
+echo '########################################################'
+
+yum install http://linuxdownload.adobe.com/adobe-release/adobe-release-x86_64-1.0-1.noarch.rpm -y
+
+}
+
+#chrome
+
+installGoogleChrome() {
+
+echo '########################################################'
+echo '# Installing Google Chrome Web Browser                 #'
+echo '########################################################'
+
+yum localinstall --nogpgcheck -y https://dl.google.com/linux/direct/google-chrome-stable_current_x86_64.rpm -y
+
+}
+
+#GoogleMusic
+installGoogleMusic() {
+echo '########################################################'
+echo '# Installing Google Music Manager                      #'
+echo '########################################################'
+
+yum install qt-x11 -y
+yum install http://dl.google.com/linux/direct/google-musicmanager-beta_current_x86_64.rpm -y
+
+}
+
+#eclipse
+installEclipse() {
+echo '########################################################'
+echo '# Installing Eclipse IDE                               #'
+echo '########################################################'
+
+yum install eclipse-jdt -y
+
+yum install glibc.i686 glibc-devel.i686 libstdc++.i686 zlib-devel.i686 ncurses-devel.i686 libX11-devel.i686 libXrender.i686 libXrandr.i686 -y
+
+}
+
+editFstab
+setupCrontab
+systemUpdate
+installRPMFusion
+installGoogleChrome
+installWMV
+installAdobeFlash
+installGoogleMusic
+installImageScan
+installEclipse
+exit 0
